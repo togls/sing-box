@@ -47,8 +47,12 @@ func (m *Manager) Start(stage adapter.StartStage) error {
 	for _, inbound := range m.inbounds {
 		err := adapter.LegacyStart(inbound, stage)
 		if err != nil && errors.Is(err, os.ErrPermission) {
-			m.Remove(inbound.Tag())
 			m.logger.Warn("inbound/", inbound.Type(), "[", inbound.Tag(), "]: ", err)
+
+			if err := m.remove(inbound.Tag()); err != nil {
+				return E.Cause(err, stage, "remove inbound/", inbound.Type(), "[", inbound.Tag(), "]")
+			}
+
 			continue
 		}
 		if err != nil {
@@ -97,9 +101,13 @@ func (m *Manager) Get(tag string) (adapter.Inbound, bool) {
 
 func (m *Manager) Remove(tag string) error {
 	m.access.Lock()
+	defer m.access.Unlock()
+	return m.remove(tag)
+}
+
+func (m *Manager) remove(tag string) error {
 	inbound, found := m.inboundByTag[tag]
 	if !found {
-		m.access.Unlock()
 		return os.ErrInvalid
 	}
 	delete(m.inboundByTag, tag)
@@ -111,7 +119,6 @@ func (m *Manager) Remove(tag string) error {
 	}
 	m.inbounds = append(m.inbounds[:index], m.inbounds[index+1:]...)
 	started := m.started
-	m.access.Unlock()
 	if started {
 		return inbound.Close()
 	}
