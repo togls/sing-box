@@ -17,9 +17,9 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-box/route/rule"
-	"github.com/sagernet/sing-dns"
-	"github.com/sagernet/sing-mux"
-	"github.com/sagernet/sing-vmess"
+	dns "github.com/sagernet/sing-dns"
+	mux "github.com/sagernet/sing-mux"
+	vmess "github.com/sagernet/sing-vmess"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
@@ -473,7 +473,7 @@ match:
 	}
 	if !preMatch && inputPacketConn != nil && !metadata.Destination.IsFqdn() && !metadata.Destination.Addr.IsGlobalUnicast() {
 		var timeout time.Duration
-		if metadata.InboundType == C.TypeSOCKS {
+		if metadata.InboundType == C.TypeSOCKS || metadata.InboundType == C.TypeMixed {
 			timeout = C.TCPTimeout
 		}
 		newBuffer, newPacketBuffers, newErr := r.actionSniff(ctx, metadata, &rule.RuleActionSniff{Timeout: timeout}, inputConn, inputPacketConn)
@@ -572,7 +572,7 @@ func (r *Router) actionSniff(
 					return
 				}
 			} else {
-				if !metadata.Destination.Addr.IsGlobalUnicast() {
+				if !metadata.Destination.IsFqdn() && !metadata.Destination.Addr.IsGlobalUnicast() {
 					metadata.Destination = destination
 				}
 				if len(packetBuffers) > 0 {
